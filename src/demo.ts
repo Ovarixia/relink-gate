@@ -16,14 +16,20 @@ const SFTP = "link-sftp-settlement";
 const here = dirname(fileURLToPath(import.meta.url));
 const repoRoot = join(here, "..");
 
+const useColor = process.env.NO_COLOR === undefined && process.stdout.isTTY;
+
+function paint(code: string, s: string): string {
+  return useColor ? `\x1b[${code}m${s}\x1b[0m` : s;
+}
+
 const c = {
-  dim: (s: string) => `\x1b[2m${s}\x1b[0m`,
-  bold: (s: string) => `\x1b[1m${s}\x1b[0m`,
-  cyan: (s: string) => `\x1b[36m${s}\x1b[0m`,
-  green: (s: string) => `\x1b[32m${s}\x1b[0m`,
-  yellow: (s: string) => `\x1b[33m${s}\x1b[0m`,
-  red: (s: string) => `\x1b[31m${s}\x1b[0m`,
-  magenta: (s: string) => `\x1b[35m${s}\x1b[0m`,
+  dim: (s: string) => paint("2", s),
+  bold: (s: string) => paint("1", s),
+  cyan: (s: string) => paint("36", s),
+  green: (s: string) => paint("32", s),
+  yellow: (s: string) => paint("33", s),
+  red: (s: string) => paint("31", s),
+  magenta: (s: string) => paint("35", s),
 };
 
 function banner(): void {
@@ -157,11 +163,19 @@ function reconnectLink(gate: ReLinkGate, linkId: string): void {
   ok(`signed canary ${canary.payload.canaryId}  ${canary.payload.reason}`);
   note(`observed path=${canary.payload.observed.path} amount=${canary.payload.observed.amount}`);
 
-  let last = false;
-  while (!last) {
+  const initialStage = gate.getLink(linkId).requirements.ramp.stages[0]?.name ?? "probe";
+  ok(`ramp opens at ${initialStage} (restricted rights)`);
+  for (;;) {
+    const before = gate.getLink(linkId).rampStageIndex;
     const ramp = gate.advanceRamp(linkId);
-    last = ramp.last;
+    if (ramp.last && ramp.index === before) {
+      ok(`ramp complete at ${ramp.stage}`);
+      break;
+    }
     ok(`ramp → ${ramp.stage} (stage ${ramp.index + 1})`);
+    if (ramp.last) {
+      break;
+    }
   }
 
   const allowed: TransportRequest =
@@ -188,7 +202,23 @@ function reconnectLink(gate: ReLinkGate, linkId: string): void {
   ok(`post-ramp ${link.kind} traffic accepted (status ${live.status})`);
 }
 
-export function runDemo(artifactDir = join(repoRoot, "artifacts")): {
+export function runDemo(artifactDir = join(repoRoot, "artifacts"), options?: { quiet?: boolean }): {
+  auditPath: string;
+  fingerprint: string;
+} {
+  const log = options?.quiet ? () => undefined : console.log;
+  const prevLog = console.log;
+  if (options?.quiet) {
+    console.log = log;
+  }
+  try {
+    return runDemoBody(artifactDir);
+  } finally {
+    console.log = prevLog;
+  }
+}
+
+function runDemoBody(artifactDir: string): {
   auditPath: string;
   fingerprint: string;
 } {

@@ -196,7 +196,7 @@ test("sealed reconnection audit verifies; tampering does not", () => {
 
 test("demo writes a dual-signed verifiable audit trace", () => {
   const dir = mkdtempSync(join(tmpdir(), "relink-"));
-  const { auditPath } = runDemo(dir);
+  const { auditPath } = runDemo(dir, { quiet: true });
   const sealed = JSON.parse(readFileSync(auditPath, "utf8")) as SealedAuditTrace;
   const result = verifyAuditTrace(sealed, sealed.trace.publicKeys);
   assert.equal(result.ok, true);
