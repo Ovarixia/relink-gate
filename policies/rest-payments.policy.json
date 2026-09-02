@@ -1,0 +1,56 @@
+{
+  "id": "rest-payments-reopen",
+  "version": "1",
+  "description": "Northwind REST payment-ingest link. Fresh signed claims open quarantine only — never full accept.",
+  "defaultEffect": "refuse",
+  "rules": [
+    {
+      "id": "refuse-revoked-or-stale",
+      "description": "Revoked or expired claims are a hard refuse.",
+      "when": {
+        "any": [
+          { "path": "claim.revoked", "op": "truthy" },
+          { "path": "claim.expired", "op": "truthy" },
+          { "path": "claim.fresh", "op": "falsy" }
+        ]
+      },
+      "effect": "refuse",
+      "reason": "Claim is not a fresh, unrevoked restoration proof"
+    },
+    {
+      "id": "refuse-unbound-challenge",
+      "description": "Partner challenge must be bound to the claim.",
+      "when": {
+        "any": [
+          { "path": "challenge.satisfied", "op": "falsy" },
+          { "path": "claim.challengeBound", "op": "falsy" }
+        ]
+      },
+      "effect": "refuse",
+      "reason": "Partner challenge not satisfied"
+    },
+    {
+      "id": "refuse-missing-assertions",
+      "description": "Link-specific assertions must all be present.",
+      "when": {
+        "all": [{ "path": "link.requiredAssertionsMet", "op": "falsy" }]
+      },
+      "effect": "refuse",
+      "reason": "Required assertions for this REST link are incomplete"
+    },
+    {
+      "id": "quarantine-fresh-claim",
+      "description": "A complete, challenged claim may enter quarantine — not production.",
+      "when": {
+        "all": [
+          { "path": "claim.fresh", "op": "truthy" },
+          { "path": "challenge.satisfied", "op": "truthy" },
+          { "path": "link.requiredAssertionsMet", "op": "truthy" },
+          { "path": "link.neverSkipQuarantine", "op": "truthy" }
+        ]
+      },
+      "effect": "quarantine",
+      "reason": "Fresh signed claim accepted into quarantine; canary still required"
+    }
+  ]
+}
