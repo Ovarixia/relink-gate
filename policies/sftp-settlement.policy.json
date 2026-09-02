@@ -1,0 +1,55 @@
+{
+  "id": "sftp-settlement-reopen",
+  "version": "1",
+  "description": "Northwind SFTP settlement drop. Same handbrake: quarantine first, never skip.",
+  "defaultEffect": "refuse",
+  "rules": [
+    {
+      "id": "refuse-stale",
+      "description": "Stale or revoked claims cannot reopen the drop.",
+      "when": {
+        "any": [
+          { "path": "claim.revoked", "op": "truthy" },
+          { "path": "claim.expired", "op": "truthy" },
+          { "path": "claim.fresh", "op": "falsy" }
+        ]
+      },
+      "effect": "refuse",
+      "reason": "SFTP restoration claim is stale or revoked"
+    },
+    {
+      "id": "refuse-challenge",
+      "description": "Unsigned or unbound SFTP reopen is refused.",
+      "when": {
+        "any": [
+          { "path": "challenge.satisfied", "op": "falsy" },
+          { "path": "claim.challengeBound", "op": "falsy" }
+        ]
+      },
+      "effect": "refuse",
+      "reason": "SFTP partner challenge not bound"
+    },
+    {
+      "id": "refuse-incomplete",
+      "description": "Key rotation and malware-clear assertions are mandatory on this drop.",
+      "when": {
+        "all": [{ "path": "link.requiredAssertionsMet", "op": "falsy" }]
+      },
+      "effect": "refuse",
+      "reason": "SFTP link assertions incomplete"
+    },
+    {
+      "id": "quarantine-drop",
+      "description": "Open only the canary prefix of the inbox.",
+      "when": {
+        "all": [
+          { "path": "claim.fresh", "op": "truthy" },
+          { "path": "challenge.satisfied", "op": "truthy" },
+          { "path": "link.requiredAssertionsMet", "op": "truthy" }
+        ]
+      },
+      "effect": "quarantine",
+      "reason": "SFTP drop reopened in quarantine prefix only"
+    }
+  ]
+}

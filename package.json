@@ -1,0 +1,47 @@
+{
+  "name": "relink-gate",
+  "version": "0.1.0",
+  "description": "Executable reconnection protocol: signed claims, quarantine, canary, and ramp-up after a supplier cutoff.",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "bin": {
+    "relink-gate": "./dist/cli.js"
+  },
+  "files": [
+    "dist",
+    "policies",
+    "LICENSE",
+    "README.md"
+  ],
+  "engines": {
+    "node": ">=20.10.0"
+  },
+  "scripts": {
+    "start": "tsx src/demo.ts",
+    "demo": "tsx src/demo.ts",
+    "verify": "tsx src/cli.ts verify",
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc --noEmit",
+    "test": "tsx --test test/*.test.ts",
+    "ci": "npm run typecheck && npm test && npm run demo && tsx src/cli.ts verify artifacts/reconnection-audit.json"
+  },
+  "keywords": [
+    "reconnection",
+    "zero-trust",
+    "audit",
+    "canary",
+    "quarantine",
+    "supply-chain"
+  ],
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Ovarixia/relink-gate.git"
+  },
+  "devDependencies": {
+    "@types/node": "^22.15.3",
+    "tsx": "^4.19.4",
+    "typescript": "^5.8.3"
+  }
+}
