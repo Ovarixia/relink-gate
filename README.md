@@ -44,13 +44,14 @@ npm start
 
 That single command (`npm start`) reconnects **two links** (REST payment ingest + SFTP settlement drop) between **Northwind Bank** and **Helios Payments**, then writes a verifiable audit:
 
-- `artifacts/reconnection-audit.json` — sealed trace (hash chain + both orgs' Ed25519 signatures + public keys)
+- `artifacts/reconnection-audit.json` — v2 trace whose complete context is hash-chained and signed by both orgs
+- `artifacts/reconnection-audit.trust.json` — demo trust policy with the two expected institutional identities
 - `artifacts/reconnection-audit.txt` — human-readable summary
 
 Verify it:
 
 ```bash
-npm run verify -- artifacts/reconnection-audit.json
+npm run verify -- artifacts/reconnection-audit.json artifacts/reconnection-audit.trust.json
 ```
 
 Run the tests:
@@ -81,7 +82,7 @@ Use this as a **shared artifact** in a security/ops tabletop:
 - “Who signs the claim, who issues the challenge, who holds the handbrake?”
 - “What does a canary look like so it cannot be confused with customer traffic?”
 
-Bring the sealed JSON to the exercise. Re-run `npm run verify` on another laptop with this repo — no shared secret is required to check the chain and signatures (public keys travel with the trace).
+Bring the sealed JSON and an **independently pinned** trust policy to the exercise. Re-run `npm run verify` on another laptop with this repo; verification requires the expected organizations, roles, key IDs, algorithms, and public keys. The adjacent trust file is convenient for this ephemeral demo, but copying it from the same untrusted source as the audit does not establish institutional identity.
 
 A reasonable next step for a pilot is to map one real cutoff playbook onto `ConnectionRequirement` objects and walk the state machine on paper or in this lab — still without attaching live credentials.
 
@@ -104,9 +105,15 @@ Demo keypairs are generated at process start and thrown away. Treat audit files 
 import { ReLinkGate, restRequirements } from "relink-gate";
 ```
 
-`ReLinkGate` is the control plane: register orgs and links, issue challenges/claims, submit to policy, `send()` through the quarantine proxy, `runCanary()`, `advanceRamp()`, `revokeClaim()` / `rollback()`, `seal()`.
+`ReLinkGate` is the control plane: register orgs and links, issue challenges, submit supplier-signed claims to policy, `send()` through the quarantine proxy, `runCanary()`, `advanceRamp()`, `revokeClaim()` / `rollback()`, `seal()`.
+
+In normal mode, suppliers create claims outside the gate with exported `issueClaim()` and caller-owned keys. Gate-managed `createClaim()` / `bindClaimToChallenge()` exist only when `demo: true`; production mode rejects them to avoid becoming a signing oracle.
 
 State transitions are explicit in `src/machine.ts`. Illegal hops throw.
+
+## Recovery assurance suite
+
+This repository is stage C of [Cyber Recovery Assurance](https://github.com/Ovarixia/cyber-recovery-assurance). The integration runner invokes ReLink Gate only after the signed A→B→C prerequisites verify, limits admission to quarantine, then verifies this repository's audit v2 against its separate trust policy.
 
 ## Development
 

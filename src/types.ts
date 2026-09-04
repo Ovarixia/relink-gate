@@ -82,6 +82,7 @@ export interface RestorationClaim {
   nonce: string;
   assertions: Record<string, boolean | string | number>;
   challengeId?: string;
+  challengeNonce?: string;
 }
 
 export interface Challenge {
@@ -183,16 +184,31 @@ export interface AuditEvent {
 }
 
 export interface AuditTrace {
-  protocol: "relink-gate-audit-v1";
+  protocol: "relink-gate-audit-v2";
   demo: boolean;
   startedAt: string;
   sealedAt: string;
   orgs: Array<Pick<Org, "id" | "name" | "role" | "keyId">>;
-  /** Relying-party and supplier public keys — enough to verify this file offline. */
+  /** Informational copies. Authenticity comes from an external AuditTrustPolicy. */
   publicKeys: Record<string, string>;
-  links: Array<Pick<Link, "id" | "name" | "kind" | "state">>;
+  links: Array<
+    Pick<Link, "id" | "name" | "kind" | "state" | "supplierOrgId" | "relyingOrgId">
+  >;
   events: AuditEvent[];
   headHash: string;
+}
+
+export interface AuditTrustSigner {
+  orgId: string;
+  role: Org["role"];
+  keyId: string;
+  alg: "Ed25519";
+  publicKeyPem: string;
+}
+
+export interface AuditTrustPolicy {
+  protocol: "relink-gate-audit-trust-v1";
+  requiredSigners: AuditTrustSigner[];
 }
 
 export interface SealedAuditTrace {

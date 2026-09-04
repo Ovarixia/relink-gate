@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { FrozenClock } from "../src/clock.js";
-import { generateOrgKeys } from "../src/crypto.js";
+import { generateOrgKeys, signPayload } from "../src/crypto.js";
 import { issueClaim, requireFreshClaim, verifyClaim } from "../src/claims.js";
 import { GateError } from "../src/types.js";
 
@@ -86,4 +86,37 @@ test("tampered payload fails signature check", () => {
   const status = verifyClaim(signed, keys.publicKeyPem, clock, new Set());
   assert.equal(status.signatureOk, false);
   assert.equal(status.fresh, false);
+});
+
+test("malformed, future, and overlong claim windows fail closed", () => {
+  const clock = new FrozenClock(new Date("2026-09-02T12:00:00Z"));
+  const keys = generateOrgKeys("org-helios");
+  const base = issueClaim(
+    {
+      linkId: "l",
+      issuerOrgId: "org-helios",
+      audienceOrgId: "org-northwind",
+      assertions: {},
+      ttlSeconds: 60,
+    },
+    keys,
+    clock,
+  );
+  const invalidPayloads = [
+    { ...base.payload, expiresAt: "not-a-date" },
+    {
+      ...base.payload,
+      issuedAt: "2026-09-02T12:01:00.000Z",
+      expiresAt: "2026-09-02T12:02:00.000Z",
+    },
+    { ...base.payload, expiresAt: "2026-09-02T12:20:00.000Z" },
+  ];
+  for (const payload of invalidPayloads) {
+    const signed = signPayload(payload, keys);
+    assert.equal(verifyClaim(signed, keys.publicKeyPem, clock, new Set(), 900).fresh, false);
+    assert.throws(
+      () => requireFreshClaim(signed, keys.publicKeyPem, clock, new Set(), 900),
+      (error: unknown) => error instanceof GateError && error.code === "CLAIM_TIME_INVALID",
+    );
+  }
 });

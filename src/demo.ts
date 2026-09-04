@@ -6,7 +6,7 @@ import { verifyAuditTrace, fingerprint } from "./audit.js";
 import { SystemClock } from "./clock.js";
 import { generateOrgKeys } from "./crypto.js";
 import { ReLinkGate, restRequirements, sftpRequirements } from "./gate.js";
-import type { RestorationClaim, TransportRequest } from "./types.js";
+import type { AuditTrustPolicy, RestorationClaim, TransportRequest } from "./types.js";
 
 const NORTHWIND = "org-northwind";
 const HELIOS = "org-helios";
@@ -151,7 +151,7 @@ function reconnectLink(gate: ReLinkGate, linkId: string): void {
           path: "/inbox/settlement/2026-09-02.xml",
           amount: 50_000,
           bytes: 2048,
-          body: { kind: "production", destination: "northwind-settlement" },
+          body: { kind: "production", amount: 50_000, destination: "northwind-settlement" },
         };
   const blocked = gate.send(linkId, forbidden);
   if (blocked.ok) {
@@ -193,7 +193,7 @@ function reconnectLink(gate: ReLinkGate, linkId: string): void {
           path: "/inbox/settlement/2026-09-02.xml",
           amount: 12,
           bytes: 1024,
-          body: { kind: "production", destination: "northwind-settlement" },
+          body: { kind: "production", amount: 12, destination: "northwind-settlement" },
         };
   const live = gate.send(linkId, allowed);
   if (!live.ok) {
@@ -204,6 +204,7 @@ function reconnectLink(gate: ReLinkGate, linkId: string): void {
 
 export function runDemo(artifactDir = join(repoRoot, "artifacts"), options?: { quiet?: boolean }): {
   auditPath: string;
+  trustPath: string;
   fingerprint: string;
 } {
   const log = options?.quiet ? () => undefined : console.log;
@@ -220,6 +221,7 @@ export function runDemo(artifactDir = join(repoRoot, "artifacts"), options?: { q
 
 function runDemoBody(artifactDir: string): {
   auditPath: string;
+  trustPath: string;
   fingerprint: string;
 } {
   banner();
@@ -231,14 +233,17 @@ function runDemoBody(artifactDir: string): {
 
   step("Seal the reconnection audit");
   const sealed = gate.seal();
-  const check = verifyAuditTrace(sealed, gate.publicKeys());
+  const trust: AuditTrustPolicy = gate.auditTrustPolicy();
+  const check = verifyAuditTrace(sealed, trust);
   if (!check.ok) {
     throw new Error(`audit verification failed: ${check.reasons.join("; ")}`);
   }
   const fp = fingerprint(sealed);
   mkdirSync(artifactDir, { recursive: true });
   const auditPath = join(artifactDir, "reconnection-audit.json");
+  const trustPath = join(artifactDir, "reconnection-audit.trust.json");
   writeFileSync(auditPath, JSON.stringify(sealed, null, 2));
+  writeFileSync(trustPath, JSON.stringify(trust, null, 2));
   const summaryPath = join(artifactDir, "reconnection-audit.txt");
   writeFileSync(
     summaryPath,
@@ -261,7 +266,8 @@ function runDemoBody(artifactDir: string): {
   );
 
   ok(`wrote ${auditPath}`);
-  ok(`hash chain + dual Ed25519 signatures verified`);
+  ok(`wrote ${trustPath}`);
+  ok(`full trace + dual Ed25519 signatures verified against external trust`);
   ok(`fingerprint ${fp}`);
   console.log(
     `\n${c.bold("Links:")} ${gate
@@ -290,10 +296,10 @@ function runDemoBody(artifactDir: string): {
   console.log(`
 ${c.bold("Done.")} This is a lab / institutional-pilot protocol demo.
 It does ${c.bold("not")} replace human or legal judgment, certify a control, or talk to a real bank.
-Verify later with:  ${c.cyan("npm run verify -- artifacts/reconnection-audit.json")}
+Verify later with:  ${c.cyan("npm run verify -- artifacts/reconnection-audit.json artifacts/reconnection-audit.trust.json")}
 `);
 
-  return { auditPath, fingerprint: fp };
+  return { auditPath, trustPath, fingerprint: fp };
 }
 
 const launchedDirectly = process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1];

@@ -9,11 +9,12 @@ export class RestPaymentSink {
 
   handle(req: TransportRequest): TransportResponse {
     this.received.push(req);
-    if (req.path !== "/v1/payments" && req.path !== "/v1/health") {
-      return { ok: false, status: 404, body: { error: "unknown route" } };
-    }
-    if (req.path === "/v1/health") {
+    if (req.op === "rest.health" && req.method === "GET" && req.path === "/v1/health") {
       return { ok: true, status: 200, body: { status: "ok" } };
+    }
+    if (!["rest.payment.canary", "rest.payment.small", "rest.payment.create"].includes(req.op) ||
+        req.method !== "POST" || req.path !== "/v1/payments") {
+      return { ok: false, status: 400, body: { error: "non-canonical REST request" } };
     }
     const body = (req.body ?? {}) as Record<string, unknown>;
     return {

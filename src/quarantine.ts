@@ -21,6 +21,10 @@ export class AccessProxy {
     if (!isLive(link.state)) {
       return { ok: false, reason: `link is ${link.state}; proxy refuses traffic` };
     }
+    if (!Number.isSafeInteger(req.bytes) || (req.bytes ?? -1) < 0 ||
+        (req.amount !== undefined && (!Number.isFinite(req.amount) || req.amount < 0))) {
+      return { ok: false, reason: "request resource measurements are not canonical" };
+    }
 
     if (link.state === "quarantine" || link.state === "canary") {
       return this.checkQuarantine(link, req);

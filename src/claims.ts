@@ -22,6 +22,7 @@ export function issueClaim(
     nonce: randomBytes(16).toString("hex"),
     assertions: input.assertions,
     challengeId: input.challengeId,
+    challengeNonce: input.challengeNonce,
   };
   return signPayload(payload, keys);
 }
@@ -29,9 +30,10 @@ export function issueClaim(
 export function bindChallenge(
   signed: SignedEnvelope<RestorationClaim>,
   challengeId: string,
+  challengeNonce: string,
   keys: KeyPair,
 ): SignedEnvelope<RestorationClaim> {
-  return signPayload({ ...signed.payload, challengeId }, keys);
+  return signPayload({ ...signed.payload, challengeId, challengeNonce }, keys);
 }
 
 export function verifyClaim(
@@ -39,15 +41,32 @@ export function verifyClaim(
   publicKeyPem: string,
   clock: Clock,
   revokedIds: Set<string>,
-): { fresh: boolean; expired: boolean; revoked: boolean; signatureOk: boolean } {
-  const signatureOk = verifyPayload(signed, publicKeyPem);
-  const expired = Date.parse(signed.payload.expiresAt) <= clock.now().getTime();
+  maxTtlSeconds?: number,
+): { fresh: boolean; expired: boolean; revoked: boolean; signatureOk: boolean; timeValid: boolean } {
+  let signatureOk = false;
+  try {
+    signatureOk = verifyPayload(signed, publicKeyPem);
+  } catch {
+    signatureOk = false;
+  }
+  const now = clock.now().getTime();
+  const issuedAt = Date.parse(signed.payload.issuedAt);
+  const expiresAt = Date.parse(signed.payload.expiresAt);
+  const duration = expiresAt - issuedAt;
+  const timeValid =
+    Number.isFinite(issuedAt) &&
+    Number.isFinite(expiresAt) &&
+    issuedAt <= now &&
+    duration > 0 &&
+    (maxTtlSeconds === undefined || duration <= maxTtlSeconds * 1_000);
+  const expired = Number.isFinite(expiresAt) && expiresAt <= now;
   const revoked = revokedIds.has(signed.payload.claimId);
   return {
     signatureOk,
+    timeValid,
     expired,
     revoked,
-    fresh: signatureOk && !expired && !revoked,
+    fresh: signatureOk && timeValid && !expired && !revoked,
   };
 }
 
@@ -56,10 +75,14 @@ export function requireFreshClaim(
   publicKeyPem: string,
   clock: Clock,
   revokedIds: Set<string>,
+  maxTtlSeconds?: number,
 ): void {
-  const status = verifyClaim(signed, publicKeyPem, clock, revokedIds);
+  const status = verifyClaim(signed, publicKeyPem, clock, revokedIds, maxTtlSeconds);
   if (!status.signatureOk) {
     throw new GateError("CLAIM_BAD_SIG", "Restoration claim signature is invalid");
+  }
+  if (!status.timeValid) {
+    throw new GateError("CLAIM_TIME_INVALID", "Restoration claim has an invalid issuance or TTL window");
   }
   if (status.revoked) {
     throw new GateError("CLAIM_REVOKED", "Restoration claim has been revoked");

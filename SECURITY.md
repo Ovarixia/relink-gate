@@ -23,5 +23,6 @@ We will acknowledge the report and work on a fix in a private branch when the is
 
 ## Demo hygiene
 
-- Treat `artifacts/reconnection-audit.json` as a **lab transcript**. It contains public keys generated for that run, not production identities.
-- If you fork this for an institutional tabletop, generate new keys and keep private keys off the audit file (this demo intentionally publishes public keys so the trace is independently verifiable).
+- Treat `artifacts/reconnection-audit.json` as a **lab transcript**. Its embedded public keys are informational copies, not production identities.
+- Audit v2 verification requires `artifacts/reconnection-audit.trust.json`. In a real pilot, pin and distribute that trust policy independently from the trace; accepting both from one untrusted source is self-authentication.
+- Generate new keys for institutional table-tops and keep private keys outside both artifacts. Gate-managed claim signing is deliberately limited to explicit demo mode.

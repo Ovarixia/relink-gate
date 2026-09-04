@@ -24,7 +24,7 @@
     "build": "tsc -p tsconfig.build.json",
     "typecheck": "tsc --noEmit",
     "test": "tsx --test test/*.test.ts",
-    "ci": "npm run typecheck && npm test && npm run demo && tsx src/cli.ts verify artifacts/reconnection-audit.json"
+    "ci": "npm run typecheck && npm test && npm run demo && tsx src/cli.ts verify artifacts/reconnection-audit.json artifacts/reconnection-audit.trust.json"
   },
   "keywords": [
     "reconnection",
