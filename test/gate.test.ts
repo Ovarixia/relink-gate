@@ -5,6 +5,7 @@ import { join } from "node:path";
 import { test } from "node:test";
 import { verifyAuditTrace } from "../src/audit.js";
 import { FrozenClock } from "../src/clock.js";
+import type { Clock } from "../src/types.js";
 import { generateOrgKeys } from "../src/crypto.js";
 import { runDemo } from "../src/demo.js";
 import { ReLinkGate, restRequirements, sftpRequirements } from "../src/gate.js";
@@ -70,6 +71,58 @@ function reopen(gate: ReLinkGate, linkId: string): void {
   const decision = gate.submitClaim(bound, challenge.challengeId);
   assert.equal(decision.effect, "quarantine");
 }
+
+class TickingClock implements Clock {
+  private at: number;
+
+  constructor(start: Date) {
+    this.at = start.getTime();
+  }
+
+  now(): Date {
+    const date = new Date(this.at);
+    this.at += 1;
+    return date;
+  }
+}
+
+test("maximum TTLs stay valid when the clock advances between reads", () => {
+  const gate = setup(new TickingClock(new Date("2026-09-02T12:00:00.000Z")));
+  const challenge = gate.issueChallenge(REST, NW);
+  assert.equal(Date.parse(challenge.expiresAt) - Date.parse(challenge.issuedAt), 300_000);
+  const claim = gate.createClaim(REST, HE, assertions(), challenge.challengeId);
+  assert.equal(Date.parse(claim.payload.expiresAt) - Date.parse(claim.payload.issuedAt), 900_000);
+  const decision = gate.submitClaim(gate.bindClaimToChallenge(claim, challenge.challengeId), challenge.challengeId);
+  assert.equal(decision.effect, "quarantine");
+
+  const denied = gate.send(REST, {
+    op: "rest.payment.create",
+    path: "/v1/payments",
+    body: { kind: "production", amount: 50_000, destination: "customer-account" },
+  });
+  assert.equal(denied.ok, false);
+  assert.match(String(denied.deniedReason), /not allowed in quarantine/);
+
+  const receipt = gate.runCanary(REST);
+  assert.equal(receipt.payload.passed, true);
+  assert.equal(receipt.payload.observed.amount, 1);
+  gate.advanceRamp(REST);
+  const done = gate.advanceRamp(REST);
+  assert.equal(done.stage, "standard");
+  assert.equal(done.last, false);
+  const finished = gate.advanceRamp(REST);
+  assert.equal(finished.stage, "standard");
+  assert.equal(finished.last, true);
+
+  const live = gate.send(REST, {
+    op: "rest.payment.create",
+    path: "/v1/payments",
+    body: { kind: "production", amount: 250, destination: "customer-account" },
+  });
+  assert.equal(live.ok, true);
+  assert.equal(live.status, 201);
+  assert.equal(gate.snapshot().links.find((link) => link.id === REST)?.rampStage, "standard");
+});
 
 test("quarantine proxy refuses full REST access", () => {
   const gate = setup();

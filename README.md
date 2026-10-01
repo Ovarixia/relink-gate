@@ -2,6 +2,29 @@
 
 **After a cyber supplier cutoff, reopening a link must be an executable proof — signed claim, partner challenge, quarantine, canary, ramp, and a handbrake — not a PDF and a call.**
 
+## One scenario, start to finish
+
+Northwind Bank has cut Helios Payments' REST ingest. Helios signs a restoration claim. Policy does not hand the link back: it opens **quarantine**, and a production `rest.payment.create` is refused. A canary of amount **1** is accepted. Rights then ramp **probe → limited → standard**, and a later production payment is accepted (status **201**).
+
+This excerpt is the REST half of one real `npm start` (`NO_COLOR=1`). Identifiers are minted for that run and change every time. REST and SFTP stay in-process simulations.
+
+```text
+▸ REST  Helios → Northwind payment ingest (REST)
+  state=cut  required=incidentClosed, keysRotated, malwareCleared, changeWindowApproved
+  ✓ Northwind issued challenge chg_b7de0d6c3b40e520
+  canary sink=northwind-canary-sink  nonce=e5976965…
+  ✓ Helios signed restoration claim clm_67da481e3f7e7d87 (TTL 900s)
+  ✓ policy quarantine-fresh-claim → QUARANTINE  Fresh signed claim accepted into quarantine; canary still required
+  ✗ full-access attempt denied: op 'rest.payment.create' not allowed in quarantine
+  ✓ signed canary cny_6812f7a6b738  canary path behaved as claimed
+  observed path=/v1/payments amount=1
+  ✓ ramp opens at probe (restricted rights)
+  ✓ ramp → limited (stage 2)
+  ✓ ramp → standard (stage 3)
+  ✓ ramp complete at standard
+  ✓ post-ramp rest traffic accepted (status 201)
+```
+
 ReLink Gate is a small TypeScript protocol for two simulated institutions (a relying party and a supplier) with **REST** and **SFTP** paths. It is meant for tabletop exercises and institutional pilots in a lab, not for live bank rails.
 
 ```
@@ -130,6 +153,8 @@ See [CONTRIBUTING.md](CONTRIBUTING.md). License: [MIT](LICENSE). Vulnerability r
 ## Français (court)
 
 **ReLink Gate** : après une coupure cyber d’un fournisseur, **rouvrir un lien** doit être une **preuve exécutable** (revendication signée, défi partenaire, quarantaine, canari, montée en charge, frein d’urgence) — pas un PDF et un appel.
+
+Le scénario en tête de page est une exécution réelle : la quarantaine bloque le paiement REST, puis les droits remontent (probe → limited → standard) jusqu’à un statut 201.
 
 Deux organisations simulées (banque vs. processeur), chemins **REST** et **SFTP**. En moins de cinq minutes :
 
