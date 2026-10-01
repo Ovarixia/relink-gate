@@ -29,3 +29,12 @@ export function iso(clock: Clock): string {
 export function addSeconds(clock: Clock, seconds: number): string {
   return new Date(clock.now().getTime() + seconds * 1000).toISOString();
 }
+
+/** Issued and expiry instants from one clock read, so a max-length TTL stays inside its cap. */
+export function ttlWindow(clock: Clock, ttlSeconds: number): { issuedAt: string; expiresAt: string } {
+  const issuedAtMs = clock.now().getTime();
+  return {
+    issuedAt: new Date(issuedAtMs).toISOString(),
+    expiresAt: new Date(issuedAtMs + ttlSeconds * 1000).toISOString(),
+  };
+}

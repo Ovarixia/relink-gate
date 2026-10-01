@@ -1,5 +1,5 @@
 import { randomBytes } from "node:crypto";
-import { addSeconds, iso } from "./clock.js";
+import { ttlWindow } from "./clock.js";
 import { signPayload, verifyPayload } from "./crypto.js";
 import type { KeyPair } from "./crypto.js";
 import type { Clock, RestorationClaim, SignedEnvelope } from "./types.js";
@@ -17,8 +17,7 @@ export function issueClaim(
     linkId: input.linkId,
     issuerOrgId: input.issuerOrgId,
     audienceOrgId: input.audienceOrgId,
-    issuedAt: iso(clock),
-    expiresAt: addSeconds(clock, input.ttlSeconds),
+    ...ttlWindow(clock, input.ttlSeconds),
     nonce: randomBytes(16).toString("hex"),
     assertions: input.assertions,
     challengeId: input.challengeId,

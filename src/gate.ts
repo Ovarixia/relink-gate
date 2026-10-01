@@ -1,5 +1,5 @@
 import { randomBytes } from "node:crypto";
-import { addSeconds, iso } from "./clock.js";
+import { ttlWindow } from "./clock.js";
 import { bindChallenge, issueClaim, requireFreshClaim, verifyClaim } from "./claims.js";
 import type { KeyPair } from "./crypto.js";
 import { AuditLog } from "./audit.js";
@@ -129,8 +129,7 @@ export class ReLinkGate {
       challengeId: `chg_${randomBytes(8).toString("hex")}`,
       linkId,
       issuedByOrgId,
-      issuedAt: iso(this.clock),
-      expiresAt: addSeconds(this.clock, ttlSeconds),
+      ...ttlWindow(this.clock, ttlSeconds),
       nonce: randomBytes(16).toString("hex"),
       requiredAssertions: [...link.requirements.requiredAssertions],
       canary: structuredClone(link.requirements.canary),
